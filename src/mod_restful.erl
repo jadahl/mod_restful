@@ -169,9 +169,9 @@ encode(json, Output) ->
 encode(xml, Output) ->
     encode_xml(Output).
 
-encode_json(_Output) ->
-    "\"ok\"".
+encode_json(Output) ->
+    mod_restful_mochijson2:encode(Output).
 
-encode_xml(_Output) ->
-    "<ok/>".
+encode_xml(Output) ->
+    xml:element_to_binary(Output).
 

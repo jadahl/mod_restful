@@ -4,7 +4,9 @@ EJABBERD_SRC_PATH=$(EJABBERD_PATH)src
 BEH_BEAMS=ebin/gen_restful_api.beam
 
 BEAMS=ebin/mod_restful.beam \
-      ebin/mod_restful_admin.beam
+      ebin/mod_restful_admin.beam \
+      ebin/mod_restful_mochinum.beam \
+      ebin/mod_restful_mochijson2.beam
 
 all: $(BEH_BEAMS) $(BEAMS)
 
