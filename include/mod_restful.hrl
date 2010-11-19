@@ -31,6 +31,10 @@
 
 -record(rest_req, {
         http_request :: #request{},
+        path :: [string()],
+        host :: string(),
+        format :: json | xml,
+        data :: any(),
         options :: list()
     }).
 
@@ -40,5 +44,7 @@
         headers = [] :: [{iolist(), iolist()}],
         output :: any() % depends on format
     }).
+
+-define(RESTFUL_CONTENTTYPE, "Content-Type").
 
 -endif. % mod_restful_hrl

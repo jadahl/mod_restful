@@ -44,9 +44,10 @@
     ]).
 
 -include("ejabberd.hrl").
-%-include("web/ejabberd_http.hrl").
 
 -include("mod_restful.hrl").
+
+-define(DEFAULT_FORMAT, json).
 
 -type api_spec() :: {[string()], module(), list()}.
 
@@ -100,12 +101,32 @@ init([_Host, Opts]) ->
 handle_call({process, Path, HTTPRequest}, _From, #state{api = API} = State) ->
     case lists:keysearch([hd(Path)], 1, API) of
         {value, {_, Module, Opts}} ->
-            Request = #rest_req{
-                http_request = HTTPRequest,
-                options = Opts
-            },
-            Response = Module:process(Request),
-            {reply, Response, State};
+            case parse_http_request(HTTPRequest) of
+                {error, Reason} ->
+                    {reply,
+                        #rest_resp{
+                            status = http_status(Reason),
+                            output = []
+                        },
+                        State};
+                {ok, Format, Data} ->
+                    Request = #rest_req{
+                        path = Path,
+                        host = HTTPRequest#request.host,
+                        format = Format,
+                        data = Data,
+                        options = Opts,
+                        http_request = HTTPRequest
+                    },
+
+                    case Module:process(Request) of
+                        {error, Reason} ->
+                            {reply, error_response(Reason, Request), State};
+                        Response ->
+                            ?INFO_MSG("Res: ~p", [Response]),
+                            {reply, Response, State}
+                    end
+            end;
         _R ->
             ?INFO_MSG("No API found: ~p (api=~p)", [_R, API]),
             {reply, {error, not_found}, State}
@@ -154,13 +175,69 @@ process(BasePath, #request{host = Host, path = Path} = Request) ->
 % Internal
 %
 
+error_response(Reason, #rest_req{format = Format}) ->
+    #rest_resp{
+        status = http_status(Reason),
+        format = Format,
+        output = resp_error_output(Reason, Format)
+    }.
+
+http_status(bad_request) -> 400;
+http_status(not_allowed) -> 401;
+http_status(not_found) -> 404.
+
+error_reason(bad_request) -> bad_request;
+error_reason(not_allowed) -> unauthorized;
+error_reason(not_found) -> not_found.
+
+resp_error_output(Reason, xml) ->
+    {xmlelement,
+        "error",
+        [{"reason", atom_to_list(error_reason(Reason))}],
+        []};
+resp_error_output(Reason, json) ->
+    [{error, error_reason(Reason)}].
+
+parse_http_request(#request{method = 'GET'}) ->
+    % FIXME to be implemented
+    {error, bad_request};
+parse_http_request(#request{method = 'POST'} = Request) ->
+    parse_http_data(get_content_type(Request), Request).
+
+get_content_type(#request{headers = Headers}) ->
+    case lists:keysearch('Content-Type', 1, Headers) of
+        {value, {_, ContentType}} ->
+            ContentType;
+        _ ->
+            undefined
+    end.
+
+-spec parse_http_data(string(), #request{}) -> {error, bad_request} | {ok, json, term()}.
+parse_http_data("application/json", #request{data = Data}) ->
+    case catch mod_restful_mochijson2:decode(Data) of
+        {'EXIT', _} ->
+            {error, bad_request};
+        JSON ->
+            {ok, json, JSON}
+    end;
+parse_http_data("application/xml", _Request) ->
+    % FIXME not implemented yet
+    {error, bad_request};
+parse_http_data(_, _Data) ->
+    {error, bad_request}.
+
 post_process(#rest_resp{
         status = Status,
         format = Format,
         headers = Headers,
         output = Output
     }) ->
-    {Status, Headers, encode(Format, Output)}.
+    Headers1 = lists:keystore(?RESTFUL_CONTENTTYPE, 1, Headers,
+        {?RESTFUL_CONTENTTYPE, content_type(Format)}),
+    {Status, Headers1, encode(Format, Output)}.
+
+content_type(json) -> "application/json";
+content_type(xml) -> "application/xml".
 
 encode(raw, Output) ->
     Output;

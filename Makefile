@@ -18,4 +18,4 @@ install: all
 	cp ebin/*.beam $(EJABBERD_SRC_PATH)
 
 clean:
-	rm ebin/*.beam
+	rm -f ebin/*.beam
