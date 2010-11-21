@@ -35,7 +35,10 @@
         % utilities
         authenticate_admin_request/1,
         authorize_key_request/1,
-        opts/2
+        get_values/2,
+        opts/2,
+        host_allowed/1,
+        simple_response/2
     ]).
 
 -include("ejabberd.hrl").
@@ -78,7 +81,11 @@ authenticate_admin_request(#rest_req{
 
 authorize_key(Key, Opts) ->
     ConfiguredKey = opts(key, Opts),
-    case {list_to_binary(ConfiguredKey), Key} of
+    CompKey = if
+        is_binary(Key) -> list_to_binary(ConfiguredKey);
+        is_list(Key) -> ConfiguredKey
+    end,
+    case {CompKey, Key} of
         {undefined, _} ->
             {error, no_key_configured};
         {Key, Key} when is_binary(Key) orelse is_list(Key) ->
@@ -107,6 +114,36 @@ authorize_key_request(#rest_req{
             authorize_key(Key, Opts)
     end.
 
+get_values(#rest_req{
+        data = {struct, Struct},
+        http_request = #request{method = 'POST'},
+        format = json}, Keys) ->
+    try
+        [
+            case lists:keysearch(list_to_binary(atom_to_list(K)), 1, Struct) of
+                {value, {_ ,V}} -> {K, binary_to_list(V)}
+            end
+            || K <- Keys
+        ]
+    catch
+        error:{case_clause, _} ->
+            {error, missing_parameters}
+    end;
+get_values(#rest_req{http_request = #request{method = 'GET', q = Q}}, Keys) ->
+    try
+        [
+            case lists:keysearch(atom_to_list(K), 1, Q) of
+                {value, {_, V}} -> {K, V}
+            end
+            || K <- Keys
+        ]
+    catch
+        error:{case_clause, _} ->
+            {error, missing_parameters}
+    end;
+get_values(_, _Keys) ->
+    {error, bad_request}.
+
 get_key(json, #rest_req{data = Data}) ->
     case Data of
         {struct, Struct} ->
@@ -127,4 +164,24 @@ opts(Key, Opts) ->
         _ ->
             undefined
     end.
+
+host_allowed(Host) ->
+    lists:member(Host, ejabberd_config:get_global_option(hosts)).
+
+simple_response(Atom, #rest_req{format = Format} = Request) ->
+    case format_simple_response(Format, Atom) of
+        {ok, Output} ->
+            #rest_resp{
+                status = 200,
+                format = Format,
+                output = Output
+            };
+        {error, Reason} ->
+            mod_restful:error_response(Reason, Request)
+    end.
+
+format_simple_response(json, Atom) ->
+    {ok, Atom};
+format_simple_response(xml, Atom) ->
+    {ok, {xmlelement, atom_to_list(Atom), [], []}}.
 

@@ -48,6 +48,7 @@
 -include("mod_restful.hrl").
 
 -define(DEFAULT_FORMAT, json).
+-define(ALLOWED_FORMATS, [json, xml]).
 
 -type api_spec() :: {[string()], module(), list()}.
 
@@ -106,6 +107,7 @@ handle_call({process, Path, HTTPRequest}, _From, #state{api = API} = State) ->
                     {reply,
                         #rest_resp{
                             status = http_status(Reason),
+                            format = raw,
                             output = []
                         },
                         State};
@@ -123,7 +125,6 @@ handle_call({process, Path, HTTPRequest}, _From, #state{api = API} = State) ->
                         {error, Reason} ->
                             {reply, error_response(Reason, Request), State};
                         Response ->
-                            ?INFO_MSG("Res: ~p", [Response]),
                             {reply, Response, State}
                     end
             end;
@@ -184,11 +185,13 @@ error_response(Reason, #rest_req{format = Format}) ->
 
 http_status(bad_request) -> 400;
 http_status(not_allowed) -> 401;
-http_status(not_found) -> 404.
+http_status(not_found) -> 404;
+http_status(_) -> 403.
 
 error_reason(bad_request) -> bad_request;
 error_reason(not_allowed) -> unauthorized;
-error_reason(not_found) -> not_found.
+error_reason(not_found) -> not_found;
+error_reason(Reason) -> Reason.
 
 resp_error_output(Reason, xml) ->
     {xmlelement,
@@ -198,9 +201,19 @@ resp_error_output(Reason, xml) ->
 resp_error_output(Reason, json) ->
     [{error, error_reason(Reason)}].
 
-parse_http_request(#request{method = 'GET'}) ->
-    % FIXME to be implemented
-    {error, bad_request};
+parse_http_request(#request{method = 'GET', q = Q}) ->
+    case lists:keysearch("format", 1, Q) of
+        {value, {_, Format}} ->
+            FormatA = list_to_atom(Format),
+            case lists:member(FormatA, ?ALLOWED_FORMATS) of
+                true ->
+                    {ok, FormatA, undefined};
+                _ ->
+                    {error, bad_request}
+            end;
+        _ ->
+            {ok, ?DEFAULT_FORMAT, undefined}
+    end;
 parse_http_request(#request{method = 'POST'} = Request) ->
     parse_http_data(get_content_type(Request), Request).
 
@@ -237,7 +250,8 @@ post_process(#rest_resp{
     {Status, Headers1, encode(Format, Output)}.
 
 content_type(json) -> "application/json";
-content_type(xml) -> "application/xml".
+content_type(xml) -> "application/xml";
+content_type(raw) -> "text/plain".
 
 encode(raw, Output) ->
     Output;
