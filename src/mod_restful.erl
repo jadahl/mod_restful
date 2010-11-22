@@ -40,7 +40,10 @@
         code_change/3, terminate/2,
 
         % http callback
-        process/2
+        process/2,
+
+        % utilities
+        simple_response/2
     ]).
 
 -include("ejabberd.hrl").
@@ -124,6 +127,8 @@ handle_call({process, Path, HTTPRequest}, _From, #state{api = API} = State) ->
                     case Module:process(Request) of
                         {error, Reason} ->
                             {reply, error_response(Reason, Request), State};
+                        {simple, Response} ->
+                            {reply, simple_response(Response, Request), State};
                         Response ->
                             {reply, Response, State}
                     end
@@ -175,6 +180,23 @@ process(BasePath, #request{host = Host, path = Path} = Request) ->
 %
 % Internal
 %
+
+simple_response(Atom, #rest_req{format = Format} = Request) ->
+    case format_simple_response(Format, Atom) of
+        {ok, Output} ->
+            #rest_resp{
+                status = 200,
+                format = Format,
+                output = Output
+            };
+        {error, Reason} ->
+            mod_restful:error_response(Reason, Request)
+    end.
+
+format_simple_response(json, Atom) ->
+    {ok, Atom};
+format_simple_response(xml, Atom) ->
+    {ok, {xmlelement, atom_to_list(Atom), [], []}}.
 
 error_response(Reason, #rest_req{format = Format}) ->
     #rest_resp{

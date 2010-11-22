@@ -69,17 +69,17 @@ process2(#rest_req{path = Path, http_request = #request{method = 'GET'}} = Reque
 post_register(Request) ->
     case username_host_password(Request) of
         [Username, Host, Password] ->
-            try_register(Username, Host, Password, Request);
+            try_register(Username, Host, Password);
         {error, Error} ->
             {error, Error}
     end.
 
-try_register(Username, Host, Password, Request) ->
+try_register(Username, Host, Password) ->
     case ejabberd_auth:try_register(Username, Host, Password) of
         {atomic, ok} ->
-            gen_restful_api:simple_response(ok, Request);
+            {simple, ok};
         {atomic, exists} ->
-            gen_restful_api:simple_response(exists, Request);
+            {error, exists};
         {error, not_allowed} ->
             {error, not_allowed}
     end.
@@ -89,7 +89,7 @@ post_unregister(Request) ->
         [Username, Host, Password] ->
             case ejabberd_auth:remove_user(Username, Host, Password) of
                 ok ->
-                    gen_restful_api:simple_response(ok, Request);
+                    {simple, ok};
                 E when (E == not_exists) or (E == not_allowed) or (E == bad_request) ->
                     {error, E};
                 error -> 
@@ -108,7 +108,7 @@ post_change_password(Request) ->
                         true ->
                             case ejabberd_auth:set_password(Username, Host, NewPassword) of
                                 ok ->
-                                    gen_restful_api:simple_response(ok, Request);
+                                    {simple, ok};
                                 _ ->
                                     {error, error}
                             end;
@@ -132,7 +132,7 @@ get_is_registered(Request) ->
             case gen_restful_api:host_allowed(Host) of
                 true ->
                     R = ejabberd_auth:is_user_exists(Username, Host),
-                    gen_restful_api:simple_response(R, Request);
+                    {simple, R};
                 _ ->
                     {error, not_allowed}
             end;

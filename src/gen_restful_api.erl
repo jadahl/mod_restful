@@ -37,8 +37,7 @@
         authorize_key_request/1,
         get_values/2,
         opts/2,
-        host_allowed/1,
-        simple_response/2
+        host_allowed/1
     ]).
 
 -include("ejabberd.hrl").
@@ -167,21 +166,4 @@ opts(Key, Opts) ->
 
 host_allowed(Host) ->
     lists:member(Host, ejabberd_config:get_global_option(hosts)).
-
-simple_response(Atom, #rest_req{format = Format} = Request) ->
-    case format_simple_response(Format, Atom) of
-        {ok, Output} ->
-            #rest_resp{
-                status = 200,
-                format = Format,
-                output = Output
-            };
-        {error, Reason} ->
-            mod_restful:error_response(Reason, Request)
-    end.
-
-format_simple_response(json, Atom) ->
-    {ok, Atom};
-format_simple_response(xml, Atom) ->
-    {ok, {xmlelement, atom_to_list(Atom), [], []}}.
 
