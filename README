@@ -1,1 +1,169 @@
-mod_restful - RESTful API for ejabberd.
+mod_restful - RESTful API for ejabberd
+======================================
+
+How to enable
+-------------
+
+Add it to a HTTP listener, or add a new HTTP listener:
+
+    {listen, [
+              {{8088, {127, 0, 0, 1}}, ejabberd_http,
+               [{request_handlers, [{["api"], mod_restful}]}]}
+             ]}.
+
+This will open the port 8088 listening on connections only on localhost.
+Requests to http://hostname:8088/api/* will be handled by mod_restful.
+
+Configuration
+-------------
+
+The module itself is configured separately. Available options are
+
+    {api, [APISpec]}
+      APISpec = {Path, Module, [ModuleOptions]}
+      Path = [string()] % ["a", "b", "c"] represents a/b/c
+      Module = module() % module responsible for requests
+      ModuleOptions = any() % module specific options
+
+An example configuration is shown
+here:
+
+    {modules, [
+           {mod_restful, [
+            {api,
+             [
+              {["admin"], mod_restful_admin, [
+               {key, "secret"},
+               {allowed_commands, [register, unregister]}
+              ]},
+              {["register"], mod_restful_register, [{key, "secret"}]}
+             ]}
+           ]}
+          ]}.
+
+This enables two sub paths to two different mod_restful modules:
+mod_restful_admin under http://hostname:8088/api/admin and
+mod_restful_register under http://hostname:8088/api/register.
+
+mod_restful_admin
+-----------------
+
+This module can be used for calling ejabberd commands remotely. Authorization
+of requests are by default done via HTTP Basic auth to authenticate a user with
+administrative privileges, or, if the key option is enabled, via a shared
+secret key.
+
+Request descriptions are done via HTTP POST requests, with a JSON document
+describing the request. Two examples of running the command register follows.
+
+To run a command, using admin@localhost:secret as basic authentication.
+
+    POST /api/admin HTTP/1.1
+    Host: example.net
+    Authorization: Basic YWRtaW5AbG9jYWxob3N0OnNlY3JldAo==
+    Content-Type: application/json
+    Content-Length: 63
+    
+    {"command":"register","args":["test","example.net","secret"]}
+
+To run a command, using a shared secret key:
+
+    POST /api/admin HTTP/1.1
+    Host: example.net
+    Content-Type: application/json
+    Content-Length: 78
+    
+    {"key":"secret","command":"register","args":["test","example.net","secret"]}
+
+When the request is authorized, the result of the command is converted to JSON.
+A reply from the server could look like this:
+
+    HTTP/1.1 200 OK
+    Content-Length: 54
+    Content-Type: application/json
+     
+    {"ok":"User test@example.net successfully registered"}
+
+Available options:
+
+    {key, Key}
+      Key = string() % secret key, used for authorization
+    {allowed_commands, [Command]}
+      Command = module() % ejabberd_command command
+
+mod_restful_register
+--------------------
+
+Available options:
+
+    {key, Key}
+      Key = string() % secret key, used for authorization
+
+mod_restful_register is an interface to user registration. It provides a
+RESTful API registering new accounts, removing existing accounts, changing
+passwords of existing accounts, and checking availability of accounts.
+
+Registration, removal and password changes are done with POST requests, while
+availability is a GET request. Using JSON, POST requests contain an object
+with keys and values. The following table describes required keys for each
+type of request.
+
+      Request type    | Key          | Description
+     ========================================================================
+                      | username     | New username
+      register        | host         | Hostname
+                      | password     | New password
+     -----------------+--------------+---------------------------------------
+                      | username     | Username to remove
+      unregister      | host         | Hostname
+                      | password     | Existing password, for authentication
+     -----------------+--------------+---------------------------------------
+                      | username     | Existing username
+                      | host         | Hostname
+      change_password | old_password | Old password, for authentication
+                      | new_password | New password
+     -----------------+--------------+---------------------------------------
+      *               | key          | Key used for authorizing the request
+     -----------------+--------------+---------------------------------------
+
+     * means the key can be used to all of the above
+
+The response to these requests can be either (in JSON) "ok" - the request was
+completed successfully, {"error":"<a reason>"} - when an error occured.
+
+An example session follows:
+
+    POST /api/register/register HTTP/1.1
+    Host: example.net
+    Content-Type: application/json
+    Content-Length: 76
+    
+    {"key":"secret","username":"test","host":"example.net","password":"secret"]}
+
+If the request was successful, a response looks like this:
+
+    HTTP/1.1 200 OK
+    Content-Length: 4
+    Content-Type: application/json
+     
+    "ok"
+
+GET requests differ in that the parameters are provided in the URL. The
+available request is the is_registered request, which takes up to three
+parameters: key, username and host.
+
+An example session follows:
+
+    GET /api/register/is_registered?username=test&host=example.net&key=secret
+    Host: example.net
+
+The response is either true or false (JSON encoded booleans). A response when
+the user exists is shown below.
+
+    HTTP/1.1 200 OK
+    Content-Length: 4
+    Content-Type: application/json
+
+    true
+
+
