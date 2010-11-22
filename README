@@ -129,7 +129,7 @@ type of request.
      * means the key can be used to all of the above
 
 The response to these requests can be either (in JSON) "ok" - the request was
-completed successfully, {"error":"<a reason>"} - when an error occured.
+completed successfully, {"error":"[reason]"} - when an error occured.
 
 An example session follows:
 
