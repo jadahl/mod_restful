@@ -43,6 +43,7 @@
         process/2,
 
         % utilities
+        error_response/2,
         simple_response/2
     ]).
 
@@ -193,12 +194,18 @@ simple_response(Atom, #rest_req{format = Format} = Request) ->
             mod_restful:error_response(Reason, Request)
     end.
 
-format_simple_response(json, Atom) ->
-    {ok, Atom};
-format_simple_response(xml, Atom) ->
-    {ok, {xmlelement, atom_to_list(Atom), [], []}}.
+format_simple_response(json, Simple) when is_atom(Simple) or is_number(Simple) ->
+    {ok, Simple};
+format_simple_response(xml, Atom) when is_atom(Atom) ->
+    {ok, {xmlelement, atom_to_list(Atom), [], []}};
+format_simple_response(xml, Number) when is_number(Number) ->
+    Out = if
+        is_integer(Number) -> integer_to_list(Number);
+        is_float(Number) -> float_to_list(Number)
+    end,
+    {ok, {xmlelement, "value", [], [{xmlcdata, Out}]}}.
 
-error_response(Reason, #rest_req{format = Format}) ->
+error_response(Reason, #rest_req{format = Format}) when is_atom(Reason) ->
     #rest_resp{
         status = http_status(Reason),
         format = Format,
@@ -210,18 +217,13 @@ http_status(not_allowed) -> 401;
 http_status(not_found) -> 404;
 http_status(_) -> 403.
 
-error_reason(bad_request) -> bad_request;
-error_reason(not_allowed) -> unauthorized;
-error_reason(not_found) -> not_found;
-error_reason(Reason) -> Reason.
-
 resp_error_output(Reason, xml) ->
     {xmlelement,
         "error",
-        [{"reason", atom_to_list(error_reason(Reason))}],
-        []};
+        [],
+        [{xmlcdata, atom_to_list(Reason)}]};
 resp_error_output(Reason, json) ->
-    [{error, error_reason(Reason)}].
+    [{error, Reason}].
 
 parse_http_request(#request{method = 'GET', q = Q}) ->
     case lists:keysearch("format", 1, Q) of
