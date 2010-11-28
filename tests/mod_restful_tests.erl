@@ -33,6 +33,8 @@
 
 -include("mod_restful.hrl").
 
+-define(FORMATS, [json, xml]).
+
 error_response_test() ->
     ReqJSON = #rest_req{format = json},
     ReqXML = #rest_req{format = xml},
@@ -54,21 +56,19 @@ error_response_test() ->
     ok.
 
 simple_response_test() ->
-    ReqJSON = #rest_req{format = json},
-    ReqXML = #rest_req{format = xml},
-
-    JSON = [
-        {ok, ok},
-        {foo, foo},
-        {true, true},
-        {123, 123}
-    ],
-
-    XML = [
-        {ok, {xmlelement, "ok", [], []}},
-        {foo, {xmlelement, "foo", [], []}},
-        {true, {xmlelement, "true", [], []}},
-        {123, {xmlelement, "value", [], [{xmlcdata, "123"}]}}
+    Tests = [
+        {json, [
+                {ok, ok},
+                {foo, foo},
+                {true, true},
+                {123, 123}
+            ]},
+        {xml, [
+                {ok, {xmlelement, "ok", [], []}},
+                {foo, {xmlelement, "foo", [], []}},
+                {true, {xmlelement, "true", [], []}},
+                {123, {xmlelement, "value", [], [{xmlcdata, "123"}]}}
+            ]}
     ],
 
     Fail = [
@@ -77,19 +77,25 @@ simple_response_test() ->
     ],
 
     [
-        ?assertEqual(#rest_resp{status = 200, format = json, output = Out}, mod_restful:simple_response(In, ReqJSON)) || {In, Out} <- JSON
+        [
+            ?assertEqual(
+                #rest_resp{status = 200, format = Format, output = Out},
+                mod_restful:simple_response(In, #rest_req{format = Format}))
+            ||
+            {In, Out} <- TestList
+        ]
+        ||
+        {Format, TestList} <- Tests
     ],
 
     [
-        ?assertEqual(#rest_resp{status = 200, format = xml, output = Out}, mod_restful:simple_response(In, ReqXML)) || {In, Out} <- XML
-    ],
-
-    [
-        ?assertError(_, mod_restful:simple_response(In, ReqJSON)) || In <- Fail
-    ],
-
-    [
-        ?assertError(_, mod_restful:simple_response(In, ReqXML)) || In <- Fail
+        [
+            ?assertError(_, mod_restful:simple_response(In, #rest_req{format = Format}))
+            ||
+            In <- Fail
+        ]
+        ||
+        Format <- ?FORMATS
     ],
 
     ok.
