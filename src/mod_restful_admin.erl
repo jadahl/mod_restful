@@ -91,15 +91,15 @@ do_process(Request) ->
                 allow ->
                     case run_command(Command, Args, Request) of
                         {error, Reason} ->
-                            gen_restful_api:resp_error(Reason, Request);
+                            {error, Reason};
                         Result ->
                             Result
                     end;
                 deny ->
-                    gen_restful_api:resp_error(not_allowed, Request)
+                    {error, not_allowed}
             end;
         {error, Reason} ->
-            gen_restful_api:resp_error(Reason, Request)
+            {error, Reason}
     end.
 
 parse_request(#rest_req{format = json, data = Data}) ->

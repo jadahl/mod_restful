@@ -47,6 +47,13 @@
         simple_response/2
     ]).
 
+-ifdef(test).
+-export(
+    [
+        parse_http_request/1
+    ]).
+-endif.
+
 -include("ejabberd.hrl").
 
 -include("mod_restful.hrl").
