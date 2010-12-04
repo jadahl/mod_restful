@@ -16,7 +16,8 @@ DIST_BEAMS=$(addprefix ebin/,$(ALL_BEAMS))
 
 TEST_BEAMS=test_ebin/tests.beam \
 	   test_ebin/mod_restful_tests.beam \
-	   test_ebin/mod_restful_admin_tests.beam
+	   test_ebin/mod_restful_admin_tests.beam \
+	   test_ebin/mod_restful_register_tests.beam
 
 TEST_DIST=$(addprefix test_ebin/,$(ALL_BEAMS)) \
 

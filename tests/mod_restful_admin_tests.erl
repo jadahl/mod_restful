@@ -87,9 +87,9 @@ ejabberd_commands_test() ->
 
         case EjabberdCommand of
             {CommandFormat, Command, Args, Result} ->
-                meck:expect(ejabberd_commands, get_command_format,
+                meck:expect_times(ejabberd_commands, get_command_format, 1,
                     fun(C) when C =:= Command -> CommandFormat end),
-                meck:expect(ejabberd_commands, execute_command,
+                meck:expect_times(ejabberd_commands, execute_command, 1,
                     fun(C, As) when (C =:= Command) and (As =:= Args) -> Result end);
             undefined ->
                 ok
@@ -97,7 +97,7 @@ ejabberd_commands_test() ->
 
         ?assertMatch(Response, mod_restful_admin:process(Request)),
 
-        meck:validate(ejabberd_commands),
+        ?assert(meck:validate(ejabberd_commands)),
 
         meck:unload()
     end,

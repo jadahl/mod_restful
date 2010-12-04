@@ -30,7 +30,8 @@
 
 -define(TESTS, [
         mod_restful_tests,
-        mod_restful_admin_tests
+        mod_restful_admin_tests,
+        mod_restful_register_tests
     ]).
 
 all_test() ->
