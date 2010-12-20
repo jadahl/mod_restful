@@ -76,8 +76,8 @@ register_given_result(Result, Response) ->
     meck:expect(ejabberd_config, get_global_option,
                 fun(hosts) -> ["localhost"] end),
 
-    meck:expect_times(ejabberd_auth, try_register, 1,
-        ?TRY_REGISTER(User, Host, Password, Result)),
+    meck:expect(ejabberd_auth, try_register,
+        ?TRY_REGISTER(User, Host, Password, Result), [{times, 1}]),
 
     ?assertMatch(Response, mod_restful_register:process(Req)),
 
