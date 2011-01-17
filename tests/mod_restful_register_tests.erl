@@ -5,7 +5,7 @@
 %%% Created : 30 Nov 2010 by Jonas Ådahl <jadahl@gmail.com>
 %%%
 %%%
-%%% Copyright (C) 2010   Jonas Ådahl
+%%% Copyright (C) 2010-2011   Jonas Ådahl
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -51,9 +51,13 @@ register_test_() ->
 
 start() ->
     meck:new(ejabberd_config),
-    meck:new(ejabberd_auth).
+    meck:new(ejabberd_auth),
+    meck:new(jlib),
+    meck:expect(jlib, nodeprep, fun(String) -> String end),
+    meck:expect(jlib, nameprep, fun(String) -> String end).
 
 stop(_) ->
+    meck:unload(jlib),
     meck:unload(ejabberd_auth),
     meck:unload(ejabberd_config).
 

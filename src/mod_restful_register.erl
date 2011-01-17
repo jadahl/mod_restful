@@ -5,7 +5,7 @@
 %%% Created : 19 Nov 2010 by Jonas Ådahl <jadahl@gmail.com>
 %%%
 %%%
-%%% Copyright (C) 2010   Jonas Ådahl
+%%% Copyright (C) 2010-2011   Jonas Ådahl
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -164,7 +164,7 @@ params(Params, Request) ->
                 {Params, Result} ->
                     case all_non_empty(Result) of
                         true ->
-                            Result;
+                            prep_result(Params, Result);
                         _ ->
                             {error, incomplete}
                     end;
@@ -176,4 +176,20 @@ params(Params, Request) ->
     end.
 
 all_non_empty(List) -> not lists:member([], List).
+
+prep_result(Params, Result) ->
+    try
+        lists:map(fun({Param, Value}) ->
+                      NewValue = case Param of
+                          username -> jlib:nodeprep(Value);
+                          host     -> jlib:nameprep(Value);
+                          _        -> Value
+                      end,
+                      if NewValue == error -> throw(prep_failed);
+                         true              -> NewValue
+                      end
+                  end, lists:zip(Params, Result))
+    catch
+        prep_failed -> {error, stringprep}
+    end.
 
