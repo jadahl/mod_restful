@@ -82,7 +82,8 @@ authorize_key(Key, Opts) ->
     ConfiguredKey = opts(key, Opts),
     CompKey = if
         is_binary(Key) -> list_to_binary(ConfiguredKey);
-        is_list(Key) -> ConfiguredKey
+        is_list(Key)   -> ConfiguredKey;
+        true           -> deny
     end,
     case {CompKey, Key} of
         {undefined, _} ->
