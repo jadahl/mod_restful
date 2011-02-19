@@ -132,13 +132,21 @@ handle_call({process, Path, HTTPRequest}, _From, #state{api = API} = State) ->
                         http_request = HTTPRequest
                     },
 
-                    case Module:process(Request) of
-                        {error, Reason} ->
-                            {reply, error_response(Reason, Request), State};
-                        {simple, Response} ->
-                            {reply, simple_response(Response, Request), State};
-                        Response ->
-                            {reply, Response, State}
+                    try
+                        R = case Module:process(Request) of
+                            {error, Reason} ->
+                                {reply, error_response(Reason, Request), State};
+                            {simple, Response} ->
+                                {reply, simple_response(Response, Request), State};
+                            Response ->
+                                {reply, Response, State}
+                        end,
+                        R
+                    catch
+                        {'EXIT', _} ->
+                            {reply, error_response(error, Request), State};
+                        error:_ ->
+                            {reply, error_response(error, Request), State}
                     end
             end;
         _R ->

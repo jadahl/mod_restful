@@ -121,7 +121,8 @@ get_values(#rest_req{
     try
         [
             case lists:keysearch(list_to_binary(atom_to_list(K)), 1, Struct) of
-                {value, {_ ,V}} -> {K, binary_to_list(V)}
+                {value, {_ ,V1}} when is_binary(V1) -> {K, binary_to_list(V1)};
+                {value, {_, V2}} ->                    {K, V2}
             end
             || K <- Keys
         ]
