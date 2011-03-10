@@ -1,7 +1,7 @@
 %%%----------------------------------------------------------------------
 %%% File    : mod_restful.erl
 %%% Author  : Jonas Ådahl <jadahl@gmail.com>
-%%% Purpose : Provides a RESTful API via http
+%%% Purpose : A RESTful API for account managment
 %%% Created : 19 Nov 2010 by Jonas Ådahl <jadahl@gmail.com>
 %%%
 %%%
@@ -69,15 +69,40 @@ process2(#rest_req{path = Path, http_request = #request{method = 'GET'}} = Reque
 post_register(Request) ->
     case username_host_password(Request) of
         [Username, Host, Password] ->
-            try_register(Username, Host, Password);
+            case try_register(Username, Host, Password) of
+                ok ->
+                    % when registration was successful and this api was
+                    % configured to handle private email, update the
+                    % private email record.
+                    case gen_restful_api:option(private_email, Request) of
+                        private_email ->
+                            set_private_email(Username, Host, Request);
+                        _R ->
+                            {simple, ok}
+                    end;
+                Error ->
+                    Error
+            end;
         {error, Error} ->
             {error, Error}
+    end.
+
+set_private_email(Username, Host, Request) ->
+    case params([email], Request) of
+        [Email] ->
+            JID = jlib:make_jid(Username, Host, ""),
+            case mod_private_email:set_email(JID, Email) of
+                ok               -> {simple, ok};
+                {error, _Reason} -> {simple, email_not_set}
+            end;
+        _ ->
+            {simple, email_not_set}
     end.
 
 try_register(Username, Host, Password) ->
     case ejabberd_auth:try_register(Username, Host, Password) of
         {atomic, ok} ->
-            {simple, ok};
+            ok;
         {atomic, exists} ->
             {error, exists};
         {error, not_allowed} ->

@@ -33,6 +33,7 @@
         behaviour_info/1,
 
         % utilities
+        option/2,
         authenticate_admin_request/1,
         authorize_key_request/1,
         get_values/2,
@@ -57,6 +58,13 @@ behaviour_info(callbacks) ->
 %
 % Utilities
 %
+
+-spec option(atom(), #rest_req{}) -> undefined | atom() | {atom(), term()}.
+option(Key, #rest_req{options = Options} = _Request) ->
+    case proplists:lookup(Key, Options) of
+        {Key, true} -> Key;
+        Result      -> Result
+    end.
 
 authenticate_admin_request(#rest_req{
         host = ReqHost,

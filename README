@@ -98,6 +98,7 @@ Available options:
 
     {key, Key}
       Key = string() % secret key, used for authorization
+    private_email
 
 mod_restful_register is an interface to user registration. It provides a
 RESTful API registering new accounts, removing existing accounts, changing
@@ -113,6 +114,7 @@ type of request.
                       | username     | New username
       register        | host         | Hostname
                       | password     | New password
+                      | email**      | Email address
      -----------------+--------------+---------------------------------------
                       | username     | Username to remove
       unregister      | host         | Hostname
@@ -126,10 +128,11 @@ type of request.
       *               | key          | Key used for authorizing the request
      -----------------+--------------+---------------------------------------
 
-     * means the key can be used to all of the above
+     *  - the key can be used to all of the above
+     ** - support activated via private_email configuration parameter
 
 The response to these requests can be either (in JSON) "ok" - the request was
-completed successfully, {"error":"[reason]"} - when an error occured.
+completed successfully, {"error":"reason"} - when an error occured.
 
 An example session follows:
 
@@ -166,4 +169,12 @@ the user exists is shown below.
 
     true
 
+An optional feature is when registering is to pass an E-mail address. This
+feature is enabled by the option "private_email". When enabled registration
+will take an extra parameter "email" supplied via the JSON document. The
+E-mail address will be stored using mod_private_email
+(https://github.com/jadahl/mod_private_email). If no E-mail, or an invalid
+E-mail is supplied, the register call will respond with the result
+"email_not_set". If an E-mail was successfully set, it will respond with a
+regular "ok" response.
 
