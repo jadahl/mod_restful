@@ -131,8 +131,28 @@ type of request.
      *  - the key can be used to all of the above
      ** - support activated via private_email configuration parameter
 
-The response to these requests can be either (in JSON) "ok" - the request was
-completed successfully, {"error":"reason"} - when an error occured.
+Possible responses are described in the following table.
+
+      Request type    | Response      | Description
+     ========================================================================
+                      | ok                   | Registration was successful
+      register        | email_not_set        | Registered without E-mail
+                      | {error, exists}      | Username already exists
+                      | {error, Error}       | Registration failed
+     -----------------+----------------------+-------------------------------
+                      | ok                   | Successfully unregistered
+      unregister      | {error, not_exists}  | Username was not registered
+                      | {error, net_allowed} | Password incorrect
+                      | {error, Error}       | Unregistration failed
+     -----------------+----------------------+-------------------------------
+                      | ok                   | Password changed
+      change_password | {error, not_allowed} | Old password was incorrect
+                      | {error, Error}       | Changing password failed
+     -----------------+----------------------+-------------------------------
+
+
+In JSON the form would be either a string, or a map. `ok` would be `"ok"`, and
+`{error, not_allowed}` would be `{"error":"not_allowed"}`.
 
 An example session follows:
 
