@@ -175,6 +175,23 @@ GET requests differ in that the parameters are provided in the URL. The
 available request is the is_registered request, which takes up to three
 parameters: key, username and host.
 
+      Request type   | Key          | Description
+     ========================================================================
+      is_registered  | username     | New username
+                     | host         | Hostname
+     ----------------+--------------+----------------------------------------
+
+Possible responses:
+
+      Request type   | Response       | Description
+     ========================================================================
+                     | true           | Username is registered
+      is_registered  | false          | Username is not registered
+                     | {error, Error} | Some error occurred
+     ----------------+----------------+--------------------------------------
+
+Output follows the same rules as the one in the POST requests.
+
 An example session follows:
 
     GET /api/register/is_registered?username=test&host=example.net&key=secret
