@@ -71,15 +71,7 @@ post_register(Request) ->
         [Username, Host, Password] ->
             case try_register(Username, Host, Password) of
                 ok ->
-                    % when registration was successful and this api was
-                    % configured to handle private email, update the
-                    % private email record.
-                    case gen_restful_api:option(private_email, Request) of
-                        private_email ->
-                            set_private_email(Username, Host, Request);
-                        _R ->
-                            {simple, ok}
-                    end;
+                    run_registered_hook(Username, Host, Request);
                 Error ->
                     Error
             end;
@@ -87,16 +79,11 @@ post_register(Request) ->
             {error, Error}
     end.
 
-set_private_email(Username, Host, Request) ->
-    case params([email], Request) of
-        [Email] ->
-            JID = jlib:make_jid(Username, Host, ""),
-            case mod_private_email:set_email(JID, Email) of
-                ok               -> {simple, ok};
-                {error, _Reason} -> {simple, email_not_set}
-            end;
-        _ ->
-            {simple, email_not_set}
+run_registered_hook(Username, Host, Request) ->
+    case ejabberd_hooks:run_fold(mod_restful_register_registered, Host, [],
+                                 [Username, Host, Request]) of
+        []                      -> {simple, ok};
+        List when is_list(List) -> {simple, {List}}
     end.
 
 try_register(Username, Host, Password) ->
@@ -115,7 +102,9 @@ post_unregister(Request) ->
             case ejabberd_auth:remove_user(Username, Host, Password) of
                 ok ->
                     {simple, ok};
-                E when (E == not_exists) or (E == not_allowed) or (E == bad_request) ->
+                E when (E == not_exists) or
+                       (E == not_allowed) or
+                       (E == bad_request) ->
                     {error, E};
                 error -> 
                     {error, bad_request}
@@ -125,13 +114,16 @@ post_unregister(Request) ->
     end.
 
 post_change_password(Request) ->
-    case params([username, host, old_password, new_password], Request) of
+    case gen_restful_api:params([username, host, old_password, new_password],
+                                Request) of
         [Username, Host, OldPassword, NewPassword] ->
             case gen_restful_api:host_allowed(Host) of
                 true ->
-                    case ejabberd_auth:check_password(Username, Host, OldPassword) of
+                    case ejabberd_auth:check_password(Username, Host,
+                                                      OldPassword) of
                         true ->
-                            case ejabberd_auth:set_password(Username, Host, NewPassword) of
+                            case ejabberd_auth:set_password(Username, Host,
+                                                            NewPassword) of
                                 ok ->
                                     {simple, ok};
                                 _ ->
@@ -152,7 +144,7 @@ post_change_password(Request) ->
 %
 
 get_is_registered(Request) ->
-    case params([username, host], Request) of
+    case gen_restful_api:params([username, host], Request) of
         [Username, Host] ->
             case gen_restful_api:host_allowed(Host) of
                 true ->
@@ -170,7 +162,7 @@ get_is_registered(Request) ->
 %
 
 username_host_password(Request) ->
-    case params([username, host, password], Request) of
+    case gen_restful_api:params([username, host, password], Request) of
         [_, Host, _] = Result ->
             case gen_restful_api:host_allowed(Host) of
                 true ->
@@ -180,41 +172,5 @@ username_host_password(Request) ->
             end;
         Error ->
             Error
-    end.
-
-params(Params, Request) ->
-    case gen_restful_api:get_values(Request, Params) of
-        L when is_list(L) ->
-            case lists:unzip(L) of
-                {Params, Result} ->
-                    case all_non_empty(Result) of
-                        true ->
-                            prep_result(Params, Result);
-                        _ ->
-                            {error, incomplete}
-                    end;
-                _ ->
-                    {error, incomplete}
-            end;
-        {error, Error} ->
-            {error, Error}
-    end.
-
-all_non_empty(List) -> not lists:member([], List).
-
-prep_result(Params, Result) ->
-    try
-        lists:map(fun({Param, Value}) ->
-                      NewValue = case Param of
-                          username -> jlib:nodeprep(Value);
-                          host     -> jlib:nameprep(Value);
-                          _        -> Value
-                      end,
-                      if NewValue == error -> throw(prep_failed);
-                         true              -> NewValue
-                      end
-                  end, lists:zip(Params, Result))
-    catch
-        prep_failed -> {error, stringprep}
     end.
 

@@ -5,7 +5,7 @@
 %%% Created : 4 Nov 2010 by Jonas Ådahl <jadahl@gmail.com>
 %%%
 %%%
-%%% Copyright (C) 2010   Jonas Ådahl
+%%% Copyright (C) 2010-2011   Jonas Ådahl
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -133,15 +133,14 @@ handle_call({process, Path, HTTPRequest}, _From, #state{api = API} = State) ->
                     },
 
                     try
-                        R = case Module:process(Request) of
+                        case Module:process(Request) of
                             {error, Reason} ->
                                 {reply, error_response(Reason, Request), State};
                             {simple, Response} ->
                                 {reply, simple_response(Response, Request), State};
                             Response ->
                                 {reply, Response, State}
-                        end,
-                        R
+                        end
                     catch
                         {'EXIT', _} ->
                             {reply, error_response(error, Request), State};
@@ -211,6 +210,8 @@ simple_response(Atom, #rest_req{format = Format} = Request) ->
 
 format_simple_response(json, Simple) when is_atom(Simple) or is_number(Simple) ->
     {ok, Simple};
+format_simple_response(json, {Entries}) when is_list(Entries) ->
+    {ok, [format_simple_json_struct_entry(Entry) || Entry <- Entries]};
 format_simple_response(xml, Atom) when is_atom(Atom) ->
     {ok, {xmlelement, atom_to_list(Atom), [], []}};
 format_simple_response(xml, Number) when is_number(Number) ->
@@ -218,7 +219,22 @@ format_simple_response(xml, Number) when is_number(Number) ->
         is_integer(Number) -> integer_to_list(Number);
         is_float(Number) -> float_to_list(Number)
     end,
-    {ok, {xmlelement, "value", [], [{xmlcdata, Out}]}}.
+    {ok, {xmlelement, "value", [], [{xmlcdata, Out}]}};
+format_simple_response(xml, {Entries}) when is_list(Entries) ->
+    {ok, {xmlelement, "struct", [],
+          [format_simple_xml_struct_entry(Entry) || Entry <- Entries]}}.
+
+format_simple_json_struct_entry({Key, Value}) when is_atom(Key) ->
+    {Key, Value}.
+
+to_list(Float) when is_float(Float)       -> float_to_list(Float);
+to_list(Integer) when is_integer(Integer) -> integer_to_list(Integer);
+to_list(Atom) when is_atom(Atom)          -> atom_to_list(Atom).
+
+format_simple_xml_struct_entry({Key, Value}) when
+  is_atom(Key), (is_number(Value) or is_atom(Value)) ->
+    {xmlelement, "entry", [{"key", to_list(Key)}],
+     [{xmlcdata, to_list(Value)}]}.
 
 error_response(Reason, #rest_req{format = Format}) when is_atom(Reason) ->
     #rest_resp{
@@ -264,7 +280,8 @@ get_content_type(#request{headers = Headers}) ->
             undefined
     end.
 
--spec parse_http_data(string(), #request{}) -> {error, bad_request} | {ok, json, term()}.
+-spec parse_http_data(string(), #request{}) ->
+    {error, bad_request} | {ok, json, term()}.
 parse_http_data("application/json", #request{data = Data}) ->
     case catch mod_restful_mochijson2:decode(Data) of
         {'EXIT', _} ->

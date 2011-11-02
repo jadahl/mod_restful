@@ -52,12 +52,14 @@ register_test_() ->
 start() ->
     meck:new(ejabberd_config),
     meck:new(ejabberd_auth),
+    meck:new(ejabberd_hooks),
     meck:new(jlib),
     meck:expect(jlib, nodeprep, fun(String) -> String end),
     meck:expect(jlib, nameprep, fun(String) -> String end).
 
 stop(_) ->
     meck:unload(jlib),
+    meck:unload(ejabberd_hooks),
     meck:unload(ejabberd_auth),
     meck:unload(ejabberd_config).
 
@@ -82,6 +84,8 @@ register_given_result(Result, Response) ->
 
     meck:expect(ejabberd_auth, try_register,
         ?TRY_REGISTER(User, Host, Password, Result), [{times, 1}]),
+
+    meck:expect(ejabberd_hooks, run_fold, 4, []),
 
     ?assertMatch(Response, mod_restful_register:process(Req)),
 

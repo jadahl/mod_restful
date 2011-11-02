@@ -94,7 +94,7 @@ Available options:
 mod_restful_register
 --------------------
 
-Available options:
+# Available options
 
     {key, Key}
       Key = string() % secret key, used for authorization
@@ -109,12 +109,13 @@ availability is a GET request. Using JSON, POST requests contain an object
 with keys and values. The following table describes required keys for each
 type of request.
 
+# Requests
+
       Request type    | Key          | Description
      ========================================================================
                       | username     | New username
       register        | host         | Hostname
                       | password     | New password
-                      | email**      | Email address
      -----------------+--------------+---------------------------------------
                       | username     | Username to remove
       unregister      | host         | Hostname
@@ -129,9 +130,8 @@ type of request.
      -----------------+--------------+---------------------------------------
 
      *  - the key can be used to all of the above
-     ** - support activated via private_email configuration parameter
 
-Possible responses are described in the following table.
+# Responses
 
       Request type    | Response      | Description
      ========================================================================
@@ -206,12 +206,18 @@ the user exists is shown below.
 
     true
 
-An optional feature is when registering is to pass an E-mail address. This
-feature is enabled by the option "private_email". When enabled registration
-will take an extra parameter "email" supplied via the JSON document. The
-E-mail address will be stored using mod_private_email
-(https://github.com/jadahl/mod_private_email). If no E-mail, or an invalid
-E-mail is supplied, the register call will respond with the result
-"email_not_set". If an E-mail was successfully set, it will respond with a
-regular "ok" response.
+# Hooks
+
+There can be hooks added for plugin style features. Currently the only hook
+implemented is `mod_restful_register_registered` which is called when a user
+successfully registered a new account. See [mod_private_email](https://github.com/jadahl/mod_private_email) for an example.
+
+A hook must return either the input value (`AccIn`) or key value pair added,
+to the beginning of the list `AccIn` (for example `[Foo | AccIn]`). The added
+value must be a key, value pair currently only allowing keys of the type
+`atom()` and values of either `float()`, `integer()` or `atom()`.
+
+If all hooks return nothing but the input value, the final response of the
+register request will be "ok". If else the request will be an object map
+consisting of the return values of the hooks.
 

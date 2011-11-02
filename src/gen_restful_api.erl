@@ -38,7 +38,8 @@
         authorize_key_request/1,
         get_values/2,
         opts/2,
-        host_allowed/1
+        host_allowed/1,
+        params/2
     ]).
 
 -include("ejabberd.hrl").
@@ -176,4 +177,48 @@ opts(Key, Opts) ->
 
 host_allowed(Host) ->
     lists:member(Host, ejabberd_config:get_global_option(hosts)).
+
+%% @spec params([atom()], #rest_req{}) -> [any()] | {error, atom()}
+%%
+%% @doc Takes a list of parameters, gathers them from the
+%% Request record, and returns a list of their corresponding values. If not
+%% all parameters were found, {error, incomplete} is returned instead. If any
+%% other error occurred, params() will return {error, Reason}.
+
+-spec params([atom()], #rest_req{}) -> [any()] | {error, atom()}.
+params(Params, Request) ->
+    case gen_restful_api:get_values(Request, Params) of
+        L when is_list(L) ->
+            case lists:unzip(L) of
+                {Params, Result} ->
+                    case all_non_empty(Result) of
+                        true ->
+                            prep_result(L);
+                        _ ->
+                            {error, incomplete}
+                    end;
+                _ ->
+                    {error, incomplete}
+            end;
+        {error, Error} ->
+            {error, Error}
+    end.
+
+all_non_empty(List) -> not lists:member([], List).
+
+prep_result(Result) ->
+    try
+        lists:map(fun({Param, Value}) ->
+                      NewValue = case Param of
+                          username -> jlib:nodeprep(Value);
+                          host     -> jlib:nameprep(Value);
+                          _        -> Value
+                      end,
+                      if NewValue == error -> throw(prep_failed);
+                         true              -> NewValue
+                      end
+                  end, Result)
+    catch
+        prep_failed -> {error, stringprep}
+    end.
 

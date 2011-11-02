@@ -58,16 +58,27 @@ error_response_test() ->
 simple_response_test() ->
     Tests = [
         {json, [
+                % basic
                 {ok, ok},
                 {foo, foo},
                 {true, true},
-                {123, 123}
+                {123, 123},
+
+                % structs
+                {{[{key, value}]}, [{key, value}]},
+                {{[{anotherkey, 52}]}, [{anotherkey, 52}]}
             ]},
         {xml, [
+                % basic
                 {ok, {xmlelement, "ok", [], []}},
                 {foo, {xmlelement, "foo", [], []}},
                 {true, {xmlelement, "true", [], []}},
-                {123, {xmlelement, "value", [], [{xmlcdata, "123"}]}}
+                {123, {xmlelement, "value", [], [{xmlcdata, "123"}]}},
+
+                % structs
+                {{[{key, value}]}, {xmlelement, "struct", [],
+                                    [{xmlelement, "entry", [{"key", "key"}],
+                                     [{xmlcdata, "value"}]}]}}
             ]}
     ],
 
