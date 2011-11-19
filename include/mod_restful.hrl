@@ -35,7 +35,8 @@
         host :: string(),
         format :: json | xml,
         data :: any(),
-        options :: list()
+        options :: list(),
+        global_options :: list()
     }).
 
 -record(rest_resp, {

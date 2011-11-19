@@ -64,7 +64,7 @@
 -type api_spec() :: {[string()], module(), list()}.
 
 -record(state, {
-        key :: undefined | string(),
+        options = [] :: [{atom(), term()}],
         api = [] :: [api_spec()]
     }).
 
@@ -91,7 +91,7 @@ stop(Host) ->
     supervisor:delete_child(ejabberd_sup, Proc).
 
 %
-% startup
+% Startup
 %
 
 start_link(Host, Opts) ->
@@ -105,51 +105,18 @@ start_link(Host, Opts) ->
 init([_Host, Opts]) ->
     case lists:keysearch(api, 1, Opts) of
         {value, {_, API}} when is_list(API) and (API /= []) ->
-            {ok, #state{api = API}};
+            Options = proplists:delete(api, Opts),
+            {ok, #state{api = API, options = Options}};
         _ ->
             {stop, no_api}
     end.
 
-handle_call({process, Path, HTTPRequest}, _From, #state{api = API} = State) ->
+handle_call({get_spec, Path}, _From, #state{api = API,
+                                            options = GlobalOpts} = State) ->
     case lists:keysearch([hd(Path)], 1, API) of
         {value, {_, Module, Opts}} ->
-            case parse_http_request(HTTPRequest) of
-                {error, Reason} ->
-                    {reply,
-                        #rest_resp{
-                            status = http_status(Reason),
-                            format = raw,
-                            output = []
-                        },
-                        State};
-                {ok, Format, Data} ->
-                    Request = #rest_req{
-                        path = Path,
-                        host = HTTPRequest#request.host,
-                        format = Format,
-                        data = Data,
-                        options = Opts,
-                        http_request = HTTPRequest
-                    },
-
-                    try
-                        case Module:process(Request) of
-                            {error, Reason} ->
-                                {reply, error_response(Reason, Request), State};
-                            {simple, Response} ->
-                                {reply, simple_response(Response, Request), State};
-                            Response ->
-                                {reply, Response, State}
-                        end
-                    catch
-                        {'EXIT', _} ->
-                            {reply, error_response(error, Request), State};
-                        error:_ ->
-                            {reply, error_response(error, Request), State}
-                    end
-            end;
-        _R ->
-            ?INFO_MSG("No API found: ~p (api=~p)", [_R, API]),
+            {reply, {ok, Module, Opts, GlobalOpts}, State};
+        _  ->
             {reply, {error, not_found}, State}
     end;
 handle_call(stop, _From, State) ->
@@ -174,27 +141,64 @@ terminate(_Reason, _State) ->
 %
 
 process(BasePath, #request{host = Host, path = Path} = Request) ->
-    case tl(Path) of
-        [] ->
-            ejabberd_web:error(not_found);
-        _ ->
-            case lists:member(Host, ejabberd_config:get_global_option(hosts)) of
-                true ->
-                    Proc = gen_mod:get_module_proc(Host, ?MODULE),
-                    case gen_server:call(Proc, {process, BasePath, Request}) of
-                        {error, Error} ->
-                            ejabberd_web:error(Error);
-                        Response ->
-                            post_process(Response)
-                    end;
-                _ ->
-                    ejabberd_web:error(not_found)
-            end
+    try
+        case tl(Path) of
+            [] ->
+                ejabberd_web:error(not_found);
+            _ ->
+                post_process(handle_request(Host, BasePath, Request))
+        end
+    catch
+        _:_ = Error ->
+            ejabberd_web:error(not_allowed)
     end.
 
 %
 % Internal
 %
+
+handle_request(Host, BasePath, Request) ->
+    true = lists:member(Host, ejabberd_config:get_global_option(hosts)),
+    Proc = gen_mod:get_module_proc(Host, ?MODULE),
+    {ok, Module, Opts, GlobalOpts} =
+        gen_server:call(Proc, {get_spec, BasePath}),
+    handle_rest_request(Module, BasePath, Opts, GlobalOpts, Request).
+
+handle_rest_request(Module, Path, Opts, GlobalOpts, HTTPRequest) ->
+    try
+        {ok, Format, Data} = parse_http_request(HTTPRequest),
+        Request = #rest_req{path = Path, options = Opts,
+                            global_options = GlobalOpts,
+                            format = Format, data = Data,
+                            host = HTTPRequest#request.host,
+                            http_request = HTTPRequest},
+        process_reply(Module:process_rest(Request), Request)
+    catch
+        {error, Reason} when is_atom(Reason) ->
+            {error, Reason};
+        _:_ = Error ->
+            {error, bad_request}
+    end.
+
+%
+% Output processing
+%
+
+process_reply(Reply, Request) ->
+    Response = case Reply of
+        {simple, Simple} -> simple_response(Simple, Request);
+        {error, Reason}  -> error_response(Reason, Request);
+        {ok, Response1}  -> Response1
+    end,
+
+    #rest_resp{status = Status,
+               format = Format,
+               headers = Headers,
+               output = Output} = Response,
+
+    Headers1 = lists:keystore(?RESTFUL_CONTENTTYPE, 1, Headers,
+        {?RESTFUL_CONTENTTYPE, content_type(Format)}),
+    {Status, Headers1, encode(Format, Output)}.
 
 simple_response(Atom, #rest_req{format = Format} = Request) ->
     case format_simple_response(Format, Atom) of
@@ -208,18 +212,30 @@ simple_response(Atom, #rest_req{format = Format} = Request) ->
             mod_restful:error_response(Reason, Request)
     end.
 
-format_simple_response(json, Simple) when is_atom(Simple) or is_number(Simple) ->
+%
+% Format JSON
+%
+format_simple_response(json, Simple) when is_atom(Simple) or
+                                          is_number(Simple) ->
     {ok, Simple};
+format_simple_response(json, String) when is_list(String) ->
+    {ok, list_to_binary(String)};
 format_simple_response(json, {Entries}) when is_list(Entries) ->
     {ok, [format_simple_json_struct_entry(Entry) || Entry <- Entries]};
+
+%
+% Format XML
+%
 format_simple_response(xml, Atom) when is_atom(Atom) ->
     {ok, {xmlelement, atom_to_list(Atom), [], []}};
-format_simple_response(xml, Number) when is_number(Number) ->
+format_simple_response(xml, Value) when is_number(Value) or is_list(Value) ->
     Out = if
-        is_integer(Number) -> integer_to_list(Number);
-        is_float(Number) -> float_to_list(Number)
+        is_integer(Value) -> integer_to_list(Value);
+        is_float(Value)   -> float_to_list(Value);
+        is_list(Value)    -> Value
     end,
-    {ok, {xmlelement, "value", [], [{xmlcdata, Out}]}};
+    OutB = list_to_binary(Out),
+    {ok, {xmlelement, "value", [], [{xmlcdata, OutB}]}};
 format_simple_response(xml, {Entries}) when is_list(Entries) ->
     {ok, {xmlelement, "struct", [],
           [format_simple_xml_struct_entry(Entry) || Entry <- Entries]}}.
@@ -255,6 +271,35 @@ resp_error_output(Reason, xml) ->
         [{xmlcdata, atom_to_list(Reason)}]};
 resp_error_output(Reason, json) ->
     [{error, Reason}].
+
+post_process({error, not_found})   -> ejabberd_web:error(not_found);
+post_process({error, not_allowed}) -> ejabberd_web:error(not_allowed);
+post_process({error, Reason})      -> {http_status(Reason), [], []};
+post_process(Result)               -> Result.
+
+content_type(json) -> "application/json";
+content_type(xml) -> "application/xml";
+content_type(raw) -> "text/plain".
+
+to_binary(Binary) when is_binary(Binary) -> Binary;
+to_binary(List) when is_list(List)       -> list_to_binary(List).
+
+encode(raw, Output) ->
+    Output;
+encode(json, Output) ->
+    encode_json(Output);
+encode(xml, Output) ->
+    encode_xml(Output).
+
+encode_json(Output) ->
+    to_binary(mod_restful_mochijson2:encode(Output)).
+
+encode_xml(Output) ->
+    xml:element_to_binary(Output).
+
+%
+% Parsing
+%
 
 parse_http_request(#request{method = 'GET', q = Q}) ->
     case lists:keysearch("format", 1, Q) of
@@ -294,31 +339,4 @@ parse_http_data("application/xml", _Request) ->
     {error, bad_request};
 parse_http_data(_, _Data) ->
     {error, bad_request}.
-
-post_process(#rest_resp{
-        status = Status,
-        format = Format,
-        headers = Headers,
-        output = Output
-    }) ->
-    Headers1 = lists:keystore(?RESTFUL_CONTENTTYPE, 1, Headers,
-        {?RESTFUL_CONTENTTYPE, content_type(Format)}),
-    {Status, Headers1, encode(Format, Output)}.
-
-content_type(json) -> "application/json";
-content_type(xml) -> "application/xml";
-content_type(raw) -> "text/plain".
-
-encode(raw, Output) ->
-    Output;
-encode(json, Output) ->
-    encode_json(Output);
-encode(xml, Output) ->
-    encode_xml(Output).
-
-encode_json(Output) ->
-    mod_restful_mochijson2:encode(Output).
-
-encode_xml(Output) ->
-    xml:element_to_binary(Output).
 

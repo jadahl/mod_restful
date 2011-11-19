@@ -73,7 +73,7 @@ simple_response_test() ->
                 {ok, {xmlelement, "ok", [], []}},
                 {foo, {xmlelement, "foo", [], []}},
                 {true, {xmlelement, "true", [], []}},
-                {123, {xmlelement, "value", [], [{xmlcdata, "123"}]}},
+                {123, {xmlelement, "value", [], [{xmlcdata, <<"123">>}]}},
 
                 % structs
                 {{[{key, value}]}, {xmlelement, "struct", [],

@@ -87,7 +87,7 @@ register_given_result(Result, Response) ->
 
     meck:expect(ejabberd_hooks, run_fold, 4, []),
 
-    ?assertMatch(Response, mod_restful_register:process(Req)),
+    ?assertMatch(Response, mod_restful_register:process_rest(Req)),
 
     ?assert(meck:validate(ejabberd_auth)).
 

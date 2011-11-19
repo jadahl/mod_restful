@@ -50,7 +50,7 @@ ejabberd_commands_test() ->
                 ["test", "localhost", "secret"],
                 {ok, "User created"}
             },
-            #rest_resp{format = json, output = [{ok, <<"User created">>}]}
+            {ok, #rest_resp{format = json, output = [{ok, <<"User created">>}]}}
         },
         {json,
             "application/json",
@@ -95,7 +95,7 @@ ejabberd_commands_test() ->
                 ok
         end,
 
-        ?assertMatch(Response, mod_restful_admin:process(Request)),
+        ?assertMatch(Response, mod_restful_admin:process_rest(Request)),
 
         ?assert(meck:validate(ejabberd_commands)),
 

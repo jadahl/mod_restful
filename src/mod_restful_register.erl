@@ -27,7 +27,7 @@
 -module(mod_restful_register).
 -author('jadahl@gmail.com').
 
--export([process/1]).
+-export([process_rest/1]).
 
 -behaviour(gen_restful_api).
 
@@ -35,7 +35,7 @@
 
 -include("include/mod_restful.hrl").
 
-process(Request) ->
+process_rest(Request) ->
     case gen_restful_api:authorize_key_request(Request) of
         allow ->
             process2(Request);

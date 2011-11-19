@@ -53,7 +53,7 @@
 
 behaviour_info(callbacks) ->
     [
-        {process, 1}
+        {process_rest, 1}
     ].
 
 %
@@ -108,19 +108,21 @@ authorize_key_request(#rest_req{
         http_request = #request{
             method = 'GET',
             q = Q},
-        options = Opts}) ->
+        options = Opts,
+        global_options = GlobalOpts}) ->
     Key = opts("key", Q),
-    authorize_key(Key, Opts);
+    authorize_key(Key, Opts ++ GlobalOpts);
 authorize_key_request(#rest_req{
         http_request = #request{method = 'POST'},
         format = Format,
-        options = Opts} = Req) ->
+        options = Opts,
+        global_options = GlobalOpts} = Req) ->
     case Format of
         undefined ->
             deny;
         Format ->
             Key = get_key(Format, Req),
-            authorize_key(Key, Opts)
+            authorize_key(Key, Opts ++ GlobalOpts)
     end.
 
 get_values(#rest_req{

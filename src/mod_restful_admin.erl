@@ -58,7 +58,7 @@
 -module(mod_restful_admin).
 -author('jadahl@gmail.com').
 
--export([process/1]).
+-export([process_rest/1]).
 
 -behaviour(gen_restful_api).
 
@@ -66,23 +66,20 @@
 
 -include("include/mod_restful.hrl").
 
-process(#rest_req{http_request = #request{method = Method}, path = Path} = Req) ->
-    case Method of
-        'POST' ->
-            case tl(Path) of
-                [] ->
-                    case authorized(Req) of
-                        allow ->
-                            do_process(Req);
-                        deny ->
-                            {error, not_allowed}
-                    end;
-                _ ->
-                    {error, not_found}
+process_rest(#rest_req{http_request = #request{method = 'POST'}, path = Path} = Req) ->
+    case tl(Path) of
+        [] ->
+            case authorized(Req) of
+                allow ->
+                    do_process(Req);
+                deny ->
+                    {error, not_allowed}
             end;
         _ ->
             {error, not_found}
-    end.
+    end;
+process_rest(_) ->
+    {error, not_found}.
 
 do_process(Request) ->
     case parse_request(Request) of
@@ -184,7 +181,7 @@ format_arg({_, string}, Arg) ->
     Arg.
 
 format_result(ResF, Res, #rest_req{format = json}) ->
-    #rest_resp{format = json, output = format_result_json(Res, ResF)};
+    {ok, #rest_resp{format = json, output = format_result_json(Res, ResF)}};
 format_result(_ResF, _Res, #rest_req{format = xml}) ->
     % FIXME not implemented
     {error, bad_request}.
