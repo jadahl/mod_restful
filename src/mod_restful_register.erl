@@ -51,6 +51,8 @@ process2(#rest_req{path = Path, http_request = #request{method = 'POST'}} = Requ
             post_unregister(Request);
         [_, "change_password"] ->
             post_change_password(Request);
+        [_, "force_change_password"] ->
+            post_force_change_password(Request);
         _ ->
             {error, not_found}
     end;
@@ -131,6 +133,23 @@ post_change_password(Request) ->
                             end;
                         _ ->
                             {error, not_allowed}
+                    end;
+                _ ->
+                    {error, not_allowed}
+            end;
+        Error ->
+            Error
+    end.
+
+post_force_change_password(Request) ->
+    case gen_restful_api:params([username, host, new_password], Request) of
+        [Username, Host, NewPassword] ->
+            case gen_restful_api:host_allowed(Host) of
+                true ->
+                    case ejabberd_auth:set_password(Username, Host,
+                                                    NewPassword) of
+                        ok -> {simple, ok};
+                        _  -> {error, error}
                     end;
                 _ ->
                     {error, not_allowed}

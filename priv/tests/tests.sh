@@ -14,6 +14,7 @@ CWD="$(dirname "$0")"
 . "$CWD/unregister.sh"
 . "$CWD/register.sh"
 . "$CWD/change_password.sh"
+. "$CWD/force_change_password.sh"
 . "$CWD/admin.sh"
 
 if [ "x`is_registered $USER`" = "xtrue" ];then
@@ -50,4 +51,8 @@ if [ "x`is_registered $ADMIN_USER`" = "xtrue" ];then
 fi
 expectRegexp '\{"ok":.*\}' admin register "[\"$ADMIN_USER\", \"$HOST\", \"$PASSWORD\"]"
 expectRegexp '\{"ok":.*\}' admin unregister "[\"$ADMIN_USER\", \"$HOST\"]"
+
+# test force_change_password
+expect '"ok"' force_change_password "$USER" sansan
+expect '"ok"' force_change_password "$USER" "$PASSWORD"
 

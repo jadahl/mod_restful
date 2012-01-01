@@ -149,7 +149,7 @@ process(BasePath, #request{host = Host, path = Path} = Request) ->
                 post_process(handle_request(Host, BasePath, Request))
         end
     catch
-        _:_ = Error ->
+        _:_ = _Error ->
             ejabberd_web:error(not_allowed)
     end.
 
@@ -176,7 +176,7 @@ handle_rest_request(Module, Path, Opts, GlobalOpts, HTTPRequest) ->
     catch
         {error, Reason} when is_atom(Reason) ->
             {error, Reason};
-        _:_ = Error ->
+        _:_ = _Error ->
             {error, bad_request}
     end.
 
