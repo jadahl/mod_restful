@@ -120,7 +120,7 @@ handle_call({get_spec, Path}, _From, #state{api = API,
             {reply, {error, not_found}, State}
     end;
 handle_call(stop, _From, State) ->
-    {stop, normal, State};
+    {stop, normal, ok, State};
 handle_call(_Req, _From, State) ->
     {reply, {error, badarg}, State}.
 
