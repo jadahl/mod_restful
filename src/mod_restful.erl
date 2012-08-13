@@ -320,7 +320,7 @@ parse_http_request(#request{method = 'POST'} = Request) ->
 get_content_type(#request{headers = Headers}) ->
     case lists:keysearch('Content-Type', 1, Headers) of
         {value, {_, ContentType}} ->
-            ContentType;
+            hd(string:tokens(ContentType, ";"));
         _ ->
             undefined
     end.
