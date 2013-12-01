@@ -42,8 +42,8 @@
         params/2
     ]).
 
--include("ejabberd.hrl").
--include("jlib.hrl").
+-include_lib("ejabberd/include/ejabberd.hrl").
+-include_lib("ejabberd/include/jlib.hrl").
 
 -include("include/mod_restful.hrl").
 
@@ -89,15 +89,10 @@ authenticate_admin_request(#rest_req{
 
 authorize_key(Key, Opts) ->
     ConfiguredKey = opts(key, Opts),
-    CompKey = if
-        is_binary(Key) -> list_to_binary(ConfiguredKey);
-        is_list(Key)   -> ConfiguredKey;
-        true           -> deny
-    end,
-    case {CompKey, Key} of
+    case {ConfiguredKey, Key} of
         {undefined, _} ->
             {error, no_key_configured};
-        {Key, Key} when is_binary(Key) orelse is_list(Key) ->
+        {Key, Key} when is_binary(Key) ->
             allow;
         _E ->
             deny
@@ -109,8 +104,8 @@ authorize_key_request(#rest_req{
             method = 'GET',
             q = Q},
         options = Opts,
-        global_options = GlobalOpts}) ->
-    Key = opts("key", Q),
+        global_options = GlobalOpts} = _Req) ->
+    Key = opts(<<"key">>, Q),
     authorize_key(Key, Opts ++ GlobalOpts);
 authorize_key_request(#rest_req{
         http_request = #request{method = 'POST'},
@@ -132,25 +127,29 @@ get_values(#rest_req{
     try
         [
             case lists:keysearch(list_to_binary(atom_to_list(K)), 1, Struct) of
-                {value, {_ ,V1}} when is_binary(V1) -> {K, binary_to_list(V1)};
-                {value, {_, V2}} ->                    {K, V2}
+                {value, {_ ,V1}} when is_list(V1) -> {K, list_to_binary(V1)};
+                {value, {_, V2}} ->                  {K, V2}
             end
             || K <- Keys
         ]
     catch
-        error:{case_clause, _} ->
+        error:{case_clause, _} = Error ->
+            error_logger:error_msg("No value error ~p~ntrace: ~p~n",
+                                   [Error, erlang:get_stacktrace()]),
             {error, missing_parameters}
     end;
 get_values(#rest_req{http_request = #request{method = 'GET', q = Q}}, Keys) ->
     try
         [
-            case lists:keysearch(atom_to_list(K), 1, Q) of
+            case lists:keysearch(list_to_binary(atom_to_list(K)), 1, Q) of
                 {value, {_, V}} -> {K, V}
             end
             || K <- Keys
         ]
     catch
-        error:{case_clause, _} ->
+        error:{case_clause, _} = Error ->
+            error_logger:error_msg("No value error ~p~ntrace: ~p~n",
+                                   [Error, erlang:get_stacktrace()]),
             {error, missing_parameters}
     end;
 get_values(_, _Keys) ->
@@ -178,7 +177,7 @@ opts(Key, Opts) ->
     end.
 
 host_allowed(Host) ->
-    lists:member(Host, ejabberd_config:get_global_option(hosts)).
+    lists:member(Host, ejabberd_config:get_global_option(hosts, fun(V) -> V end)).
 
 %% @spec params([atom()], #rest_req{}) -> [any()] | {error, atom()}
 %%
@@ -221,6 +220,9 @@ prep_result(Result) ->
                       end
                   end, Result)
     catch
-        prep_failed -> {error, stringprep}
+        prep_failed ->
+            error_logger:error_msg("Failed to prepare result~nresult: ~p~ntrace: ~p~n",
+                                   [Result, erlang:get_stacktrace()]),
+            {error, stringprep}
     end.
 

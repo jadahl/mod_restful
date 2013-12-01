@@ -31,7 +31,7 @@
 
 -behaviour(gen_restful_api).
 
--include("ejabberd.hrl").
+-include_lib("ejabberd/include/ejabberd.hrl").
 
 -include("include/mod_restful.hrl").
 
@@ -45,20 +45,20 @@ process_rest(Request) ->
 
 process2(#rest_req{path = Path, http_request = #request{method = 'POST'}} = Request) ->
     case Path of
-        [_, "register"] ->
+        [_, <<"register">>] ->
             post_register(Request);
-        [_, "unregister"] ->
+        [_, <<"unregister">>] ->
             post_unregister(Request);
-        [_, "change_password"] ->
+        [_, <<"change_password">>] ->
             post_change_password(Request);
-        [_, "force_change_password"] ->
+        [_, <<"force_change_password">>] ->
             post_force_change_password(Request);
         _ ->
             {error, not_found}
     end;
 process2(#rest_req{path = Path, http_request = #request{method = 'GET'}} = Request) ->
     case Path of
-        [_, "is_registered"] ->
+        [_, <<"is_registered">>] ->
             get_is_registered(Request);
         _ ->
             {error, not_found}

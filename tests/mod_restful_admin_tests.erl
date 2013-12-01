@@ -30,36 +30,36 @@
 -compile(export_all).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("ejabberd/include/ejabberd.hrl").
 
 -include("mod_restful.hrl").
--include("ejabberd.hrl").
 
 ejabberd_commands_test() ->
-    Options = [{allowed_commands, [register]}, {key, "secret"}],
+    Options = [{allowed_commands, [register]}, {key, <<"secret">>}],
     Path = ["admin"],
     Tests = [
         {json,
-            "application/json",
+            <<"application/json">>,
             "{\"key\":\"secret\",\"command\":\"register\",\"args\":[\"test\",\"localhost\",\"secret\"]}",
             {
                 {
-                    [{user, string}, {host, string}, {password, string}],
+                    [{user, binary}, {host, binary}, {password, binary}],
                     {result, restuple}
                 },
                 register,
-                ["test", "localhost", "secret"],
+                [<<"test">>, <<"localhost">>, <<"secret">>],
                 {ok, "User created"}
             },
             {ok, #rest_resp{format = json, output = [{ok, <<"User created">>}]}}
         },
         {json,
-            "application/json",
+            <<"application/json">>,
             "{\"key\":\"notsecret\",\"command\":\"register\",\"args\":[\"test\",\"localhost\",\"secret\"]}",
             undefined,
             {error, not_allowed}
         },
         {json,
-            "application/json",
+            <<"application/json">>,
             "{\"key\":\"secret\",\"command\":\"unregister\",\"args\":[\"test\",\"localhost\"]}",
             undefined,
             {error, not_allowed}
@@ -95,7 +95,7 @@ ejabberd_commands_test() ->
                 ok
         end,
 
-        ?assertMatch(Response, mod_restful_admin:process_rest(Request)),
+        ?assertEqual(Response, mod_restful_admin:process_rest(Request)),
 
         ?assert(meck:validate(ejabberd_commands)),
 

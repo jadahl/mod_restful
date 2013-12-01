@@ -54,7 +54,7 @@
     ]).
 -endif.
 
--include("ejabberd.hrl").
+-include_lib("ejabberd/include/ejabberd.hrl").
 
 -include("mod_restful.hrl").
 
@@ -86,7 +86,7 @@ start(Host, Opts) ->
 
 stop(Host) ->
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
-    gen_server:call(Proc, stop),
+    catch gen_server:call(Proc, stop),
     supervisor:terminate_child(ejabberd_sup, Proc),
     supervisor:delete_child(ejabberd_sup, Proc).
 
@@ -111,13 +111,23 @@ init([_Host, Opts]) ->
             {stop, no_api}
     end.
 
+get_api_mod(_Path, []) ->
+    undefined;
+get_api_mod(Path, [Mod | API]) ->
+    case proplists:get_value(path, Mod) of
+        Path -> Mod;
+        _ -> get_api_mod(Path, API)
+    end.
+
 handle_call({get_spec, Path}, _From, #state{api = API,
                                             options = GlobalOpts} = State) ->
-    case lists:keysearch([hd(Path)], 1, API) of
-        {value, {_, Module, Opts}} ->
-            {reply, {ok, Module, Opts, GlobalOpts}, State};
-        _  ->
-            {reply, {error, not_found}, State}
+    case get_api_mod([hd(Path)], API) of
+        undefined ->
+            {reply, {error, not_found}, State};
+        Mod ->
+            Module = proplists:get_value(module, Mod),
+            Opts = proplists:get_value(params, Mod),
+            {reply, {ok, Module, Opts, GlobalOpts}, State}
     end;
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
@@ -149,7 +159,13 @@ process(BasePath, #request{host = Host, path = Path} = Request) ->
                 post_process(handle_request(Host, BasePath, Request))
         end
     catch
-        _:_ = _Error ->
+        _ = Error ->
+            error_logger:error_msg("Processing throwed error ~p~ntrace: ~p~n",
+                                   [Error, erlang:get_stacktrace()]),
+            ejabberd_web:error(not_allowed);
+        _:_ = Error ->
+            error_logger:error_msg("Processing throwed error ~p~ntrace: ~p~n",
+                                   [Error, erlang:get_stacktrace()]),
             ejabberd_web:error(not_allowed)
     end.
 
@@ -158,7 +174,7 @@ process(BasePath, #request{host = Host, path = Path} = Request) ->
 %
 
 handle_request(Host, BasePath, Request) ->
-    true = lists:member(Host, ejabberd_config:get_global_option(hosts)),
+    true = lists:member(Host, ejabberd_config:get_global_option(hosts, fun(V) -> V end)),
     Proc = gen_mod:get_module_proc(Host, ?MODULE),
     {ok, Module, Opts, GlobalOpts} =
         gen_server:call(Proc, {get_spec, BasePath}),
@@ -174,9 +190,13 @@ handle_rest_request(Module, Path, Opts, GlobalOpts, HTTPRequest) ->
                             http_request = HTTPRequest},
         process_reply(Module:process_rest(Request), Request)
     catch
-        {error, Reason} when is_atom(Reason) ->
+        {error, Reason} = Error when is_atom(Reason) ->
+            error_logger:error_msg("Processing throwed error ~p~ntrace: ~p~n",
+                                   [Error, erlang:get_stacktrace()]),
             {error, Reason};
-        _:_ = _Error ->
+        _:_ = Error ->
+            error_logger:error_msg("Processing throwed error ~p~ntrace: ~p~n",
+                                   [Error, erlang:get_stacktrace()]),
             {error, bad_request}
     end.
 
@@ -302,13 +322,14 @@ encode_xml(Output) ->
 %
 
 parse_http_request(#request{method = 'GET', q = Q}) ->
-    case lists:keysearch("format", 1, Q) of
+    case lists:keysearch(<<"format">>, 1, Q) of
         {value, {_, Format}} ->
-            FormatA = list_to_atom(Format),
+            FormatA = list_to_atom(binary_to_list(Format)),
             case lists:member(FormatA, ?ALLOWED_FORMATS) of
                 true ->
                     {ok, FormatA, undefined};
                 _ ->
+                    error_logger:warning_msg("Format ~s not allowed~n", [Format]),
                     {error, bad_request}
             end;
         _ ->
@@ -327,16 +348,14 @@ get_content_type(#request{headers = Headers}) ->
 
 -spec parse_http_data(string(), #request{}) ->
     {error, bad_request} | {ok, json, term()}.
-parse_http_data("application/json", #request{data = Data}) ->
-    case catch mod_restful_mochijson2:decode(Data) of
-        {'EXIT', _} ->
-            {error, bad_request};
-        JSON ->
-            {ok, json, JSON}
-    end;
-parse_http_data("application/xml", _Request) ->
+parse_http_data(<<"application/json">>, #request{data = Data}) ->
+    JSON = mod_restful_mochijson2:decode(Data),
+    {ok, json, JSON};
+parse_http_data(<<"application/xml">>, _Request) ->
     % FIXME not implemented yet
+    error_logger:warning_msg("XML support not implemented yet~n"),
     {error, bad_request};
-parse_http_data(_, _Data) ->
+parse_http_data(_Format, _Data) ->
+    error_logger:warning_msg("Unknown format ~s~n", [_Format]),
     {error, bad_request}.
 

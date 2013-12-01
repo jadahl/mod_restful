@@ -62,7 +62,7 @@
 
 -behaviour(gen_restful_api).
 
--include("ejabberd.hrl").
+-include_lib("ejabberd/include/ejabberd.hrl").
 
 -include("include/mod_restful.hrl").
 
@@ -82,21 +82,23 @@ process_rest(_) ->
     {error, not_found}.
 
 do_process(Request) ->
-    case parse_request(Request) of
-        {command, Command, Args} ->
-            case command_allowed(Command, Request) of
-                allow ->
-                    case run_command(Command, Args, Request) of
-                        {error, Reason} ->
-                            {error, Reason};
-                        Result ->
-                            Result
-                    end;
-                deny ->
-                    {error, not_allowed}
-            end;
-        {error, Reason} ->
-            {error, Reason}
+    try
+        {command, Command, Args} = parse_request(Request),
+        case command_allowed(Command, Request) of
+            allow ->
+                case run_command(Command, Args, Request) of
+                    {error, Reason} ->
+                        {error, Reason};
+                    Result ->
+                        Result
+                end;
+            deny ->
+                {error, not_allowed}
+        end
+    catch
+        {'EXIT', _} = Exception ->
+            error_logger:error_msg("Request caused exception: ~w\n", [Exception]),
+            {error, bad_request}
     end.
 
 parse_request(#rest_req{format = json, data = Data}) ->
@@ -113,20 +115,14 @@ parse_json({struct, Struct}) ->
                                          {Command, NewArgs};
                                      _ ->
                                          {Command, Args}
-                                 end;
-                             _ ->
-                                 undefined
+                                 end
                          end
                      end, {undefined, undefined}, Struct) of
         {CMD, ARGV} when is_binary(CMD) and is_list(ARGV) ->
             {command,
                 list_to_atom(binary_to_list(CMD)),
-                [binary_to_list(ARG) || ARG <- ARGV]};
-        _ ->
-            {error, bad_request}
-    end;
-parse_json(_) ->
-    {error, bad_request}.
+                [ARG || ARG <- ARGV]}
+    end.
 
 command_allowed(Command, #rest_req{options = Options}) ->
     case gen_restful_api:opts(allowed_commands, Options) of
@@ -151,33 +147,29 @@ authorized(Request) ->
 
 run_command(Command, Args, Req) ->
     case ejabberd_commands:get_command_format(Command) of
-        {error, _E} ->
+        {error, _} ->
             {error, bad_request};
         {ArgsF, ResF} ->
-            case format_args(ArgsF, Args) of
-                {error, Reason} ->
-                    {error, Reason};
-                ArgsFormatted ->
-                    case ejabberd_commands:execute_command(Command, ArgsFormatted) of
-                        {error, _Error} ->
-                            {error, bad_request};
-                        Result ->
-                            format_result(ResF, Result, Req)
-                    end
+            {ok, ArgsFormatted} = format_args(ArgsF, Args),
+            case ejabberd_commands:execute_command(Command, ArgsFormatted) of
+                {error, _Error} ->
+                    {error, internal_error};
+                Result ->
+                    format_result(ResF, Result, Req)
             end
     end.
 
 format_args(ArgsF, Args) ->
-    case catch [format_arg(ArgF, Arg) || {ArgF, Arg} <- lists:zip(ArgsF, Args)] of
-        {'EXIT', _} ->
-            {error, bad_request};
+    case [format_arg(ArgF, Arg) || {ArgF, Arg} <- lists:zip(ArgsF, Args)] of
         ArgsFormatted ->
-            ArgsFormatted
+            {ok, ArgsFormatted}
     end.
 
 format_arg({_, integer}, Arg) ->
-    list_to_integer(Arg);
+    list_to_integer(binary_to_list(Arg));
 format_arg({_, string}, Arg) ->
+    binary_to_list(Arg);
+format_arg({_, binary}, Arg) ->
     Arg.
 
 format_result(ResF, Res, #rest_req{format = json}) ->

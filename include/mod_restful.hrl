@@ -27,7 +27,7 @@
 -ifndef(mod_restful_hrl).
 -define(mod_restful_hrl, true).
 
--include("web/ejabberd_http.hrl").
+-include_lib("ejabberd/include/ejabberd_http.hrl").
 
 -record(rest_req, {
         http_request :: #request{},

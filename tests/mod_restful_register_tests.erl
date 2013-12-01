@@ -33,7 +33,7 @@
 
 -include("mod_restful.hrl").
 
--define(OPTIONS, [{key, "secret"}]).
+-define(OPTIONS, [{key, <<"secret">>}]).
 
 -define(TRY_REGISTER(User, Host, Password, Result),
     fun(U, H, P) when
@@ -73,21 +73,21 @@ register_error() ->
     register_given_result({error, not_allowed}, {error, not_allowed}).
 
 register_given_result(Result, Response) ->
-    User = "test",
-    Host = "localhost",
-    Password = "foo",
+    User = <<"test">>,
+    Host = <<"localhost">>,
+    Password = <<"foo">>,
     Data = <<"{\"key\":\"secret\",\"username\":\"test\",\"host\":\"localhost\",\"password\":\"foo\"}">>,
-    Req = json_req(Data, 'POST', ["register", "register"]),
+    Req = json_req(Data, 'POST', [<<"register">>, <<"register">>]),
 
     meck:expect(ejabberd_config, get_global_option,
-                fun(hosts) -> ["localhost"] end),
+                fun(hosts, _) -> [<<"localhost">>] end),
 
     meck:expect(ejabberd_auth, try_register,
         ?TRY_REGISTER(User, Host, Password, Result), [{times, 1}]),
 
     meck:expect(ejabberd_hooks, run_fold, 4, []),
 
-    ?assertMatch(Response, mod_restful_register:process_rest(Req)),
+    ?assertEqual(Response, mod_restful_register:process_rest(Req)),
 
     ?assert(meck:validate(ejabberd_auth)).
 
@@ -107,5 +107,5 @@ rest_req(Data, Format, ContentType, Method, Path) ->
         options = ?OPTIONS}.
 
 json_req(Data, Method, Path) ->
-    rest_req(Data, json, "application/json", Method, Path).
+    rest_req(Data, json, <<"application/json">>, Method, Path).
 
