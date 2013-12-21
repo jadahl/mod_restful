@@ -5,7 +5,7 @@ init_config()
     echo Creating $1... > /dev/stderr
     cat << __EOF__ > "$1"
 HOST=localhost
-SERVER=::1:8088
+SERVER="[::1]:8088"
 BASE_PATH=api
 CURL_EXTRA=-6
 KEY=secret
@@ -28,12 +28,13 @@ request()
     echo POST $SUB_PATH, json: > $DEBUG_OUTPUT
     echo $JSON > $DEBUG_OUTPUT
     echo . > $DEBUG_OUTPUT
-    echo '###' Running curl: curl -X POST http://$SERVER/$BASE_PATH/$SUB_PATH $EXTRA -v \
+    echo '###' Running curl: curl -g -X POST \
+	"http://$SERVER/$BASE_PATH/$SUB_PATH" $EXTRA -v \
         -H "Content-Type: application/json" -H "Host: $HOST" \
-        -d "$JSON" > $DEBUG_OUTPUT
-    curl -X POST http://$SERVER/$BASE_PATH/$SUB_PATH $EXTRA -v \
+	-d "$JSON" > $DEBUG_OUTPUT
+    curl -g -X POST "http://$SERVER/$BASE_PATH/$SUB_PATH" $EXTRA -v \
         -H "Content-Type: application/json" -H "Host: $HOST" \
-        -d "$JSON" 2> $DEBUG_OUTPUT
+	-d "$JSON" 2> $DEBUG_OUTPUT
 }
 
 get()
@@ -45,8 +46,11 @@ get()
     echo GET $SUB_PATH, params: > $DEBUG_OUTPUT
     echo $PARAMS > $DEBUG_OUTPUT
     echo . > $DEBUG_OUTPUT
-    curl http://$SERVER/$BASE_PATH/$SUB_PATH\?$PARAMS $EXTRA -v \
-        -H "Host: $HOST" 2> $DEBUG_OUTPUT
+    echo '###' Running curl: curl -g \
+	"http://$SERVER/$BASE_PATH/$SUB_PATH?$PARAMS" $EXTRA -v \
+	-H "Host: $HOST" > $DEBUG_OUTPUT
+    curl -g "http://$SERVER/$BASE_PATH/$SUB_PATH?$PARAMS" $EXTRA -v \
+	-H "Host: $HOST" 2> $DEBUG_OUTPUT
 }
 
 # test framework

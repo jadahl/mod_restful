@@ -1,5 +1,5 @@
 HOST=localhost
-SERVER=::1:8088
+SERVER="[::1]:8088"
 BASE_PATH=api
 CURL_EXTRA=-6
 KEY=secret
