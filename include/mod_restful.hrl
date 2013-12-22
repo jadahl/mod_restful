@@ -46,6 +46,6 @@
         output :: any() % depends on format
     }).
 
--define(RESTFUL_CONTENTTYPE, "Content-Type").
+-define(RESTFUL_CONTENTTYPE, <<"Content-Type">>).
 
 -endif. % mod_restful_hrl

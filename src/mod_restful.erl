@@ -301,9 +301,9 @@ post_process({error, not_allowed}) -> ejabberd_web:error(not_allowed);
 post_process({error, Reason})      -> {http_status(Reason), [], []};
 post_process(Result)               -> Result.
 
-content_type(json) -> "application/json";
-content_type(xml) -> "application/xml";
-content_type(raw) -> "text/plain".
+content_type(json) -> <<"application/json">>;
+content_type(xml) -> <<"application/xml">>;
+content_type(raw) -> <<"text/plain">>.
 
 to_binary(Binary) when is_binary(Binary) -> Binary;
 to_binary(List) when is_list(List)       -> list_to_binary(List).
