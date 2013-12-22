@@ -240,6 +240,8 @@ format_simple_response(json, Simple) when is_atom(Simple) or
     {ok, Simple};
 format_simple_response(json, String) when is_list(String) ->
     {ok, list_to_binary(String)};
+format_simple_response(json, Binary) when is_binary(Binary) ->
+    {ok, Binary};
 format_simple_response(json, {Entries}) when is_list(Entries) ->
     {ok, [format_simple_json_struct_entry(Entry) || Entry <- Entries]};
 
