@@ -123,6 +123,8 @@ handle_call({get_spec, Path}, _From, #state{api = API,
                                             options = GlobalOpts} = State) ->
     case get_api_mod([hd(Path)], API) of
         undefined ->
+            error_logger:warning_msg("API module for path ~p not found~n",
+                                     [hd(Path)]),
             {reply, {error, not_found}, State};
         Mod ->
             Module = proplists:get_value(module, Mod),
