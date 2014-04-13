@@ -185,7 +185,7 @@ format_result_json(Atom, {_, atom}) ->
 format_result_json(Int, {_, integer}) ->
     integer_to_list(Int);
 format_result_json(String, {_, string}) ->
-    list_to_binary(String);
+    String;
 format_result_json(Code, {_, rescode}) ->
     Code;
 format_result_json({Code, Text}, {_, restuple}) ->
