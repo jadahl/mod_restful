@@ -127,7 +127,7 @@ parse_json({struct, Struct}) ->
 command_allowed(Command, #rest_req{options = Options}) ->
     case gen_restful_api:opts(allowed_commands, Options) of
         undefined ->
-            deny;
+            allow;
         AllowedCommands ->
             case lists:member(Command, AllowedCommands) of
                 true -> allow;
