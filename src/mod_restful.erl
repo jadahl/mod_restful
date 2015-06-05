@@ -54,7 +54,7 @@
     ]).
 -endif.
 
--include_lib("ejabberd/include/ejabberd.hrl").
+-include_lib("ejabberd.hrl").
 
 -include("mod_restful.hrl").
 
