@@ -62,9 +62,9 @@
 
 -behaviour(gen_restful_api).
 
--include_lib("ejabberd/include/ejabberd.hrl").
+-include_lib("ejabberd.hrl").
 
--include("include/mod_restful.hrl").
+-include("mod_restful.hrl").
 
 process_rest(#rest_req{http_request = #request{method = 'POST'}, path = Path} = Req) ->
     case tl(Path) of
@@ -185,11 +185,13 @@ format_result_json(Atom, {_, atom}) ->
 format_result_json(Int, {_, integer}) ->
     integer_to_list(Int);
 format_result_json(String, {_, string}) ->
-    list_to_binary(String);
+    String;
 format_result_json(Code, {_, rescode}) ->
     Code;
 format_result_json({Code, Text}, {_, restuple}) ->
     [{Code, list_to_binary(Text)}];
+format_result_json([], {_, {list, ElementsF}}) ->
+   [];
 format_result_json([E], {_, {list, ElementsF}}) ->
     [format_result_json(E, ElementsF)];
 format_result_json([E|T], {X, {list, ElementsF}}) ->
@@ -198,4 +200,3 @@ format_result_json(Tuple, {_, {tuple, ElementsF}}) ->
     TupleL = tuple_to_list(Tuple),
     % format a tuple as a list
     [format_result_json(E, F) || {E, F} <- lists:zip(TupleL, ElementsF)].
-
