@@ -190,6 +190,8 @@ format_result_json(Code, {_, rescode}) ->
     Code;
 format_result_json({Code, Text}, {_, restuple}) ->
     [{Code, list_to_binary(Text)}];
+format_result_json([], {_, {list, _ElementsF}}) ->
+    [];
 format_result_json([E], {_, {list, ElementsF}}) ->
     [format_result_json(E, ElementsF)];
 format_result_json([E|T], {X, {list, ElementsF}}) ->
