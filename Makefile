@@ -1,11 +1,11 @@
-PREFIX=/usr
+PREFIX=
 
 EJABBERD_PATH=../ejabberd/
 EJABBERD_SRC_PATH=$(EJABBERD_PATH)src
 
 BEH_BEAMS=gen_restful_api.beam
 
-INCLUDE=-I ./include -I $(PREFIX)/lib -pa $(PREFIX)/lib/ejabberd/ebin
+INCLUDE=-I ../include -I ./include -I $(PREFIX)/lib -pa $(PREFIX)/lib/ejabberd/ebin
 
 BEAMS=mod_restful.beam \
       mod_restful_admin.beam \
